@@ -1,6 +1,8 @@
 #!/bin/sh
 # Runs Filtarr as PUID:PGID (default 1000:1000; Unraid uses 99:100) and makes sure that user owns /config.
 set -e
+# Unraid's Host network mode has no port mapping; it passes the WebUI port setting as TCP_PORT_3000 instead.
+if [ -n "$TCP_PORT_3000" ]; then export PORT="$TCP_PORT_3000"; fi
 if [ "$(id -u)" = "0" ]; then
   PUID="${PUID:-1000}"
   PGID="${PGID:-1000}"

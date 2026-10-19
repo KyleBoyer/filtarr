@@ -3,7 +3,7 @@
   <Name>Filtarr</Name>
   <Repository>ghcr.io/kyleboyer/filtarr:latest</Repository>
   <Registry>https://github.com/KyleBoyer/filtarr/pkgs/container/filtarr</Registry>
-  <Network>bridge</Network>
+  <Network>host</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
@@ -18,7 +18,7 @@
   <PostArgs/>
   <CPUset/>
   <Requires>Sonarr and/or Radarr. Plex is used for sign-in.</Requires>
-  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Port for the Filtarr web interface and API." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Port for the Filtarr web interface and API. Uses Host networking by default, like Overseerr, so Sonarr, Radarr, Tautulli and Plex can be reached at localhost or the server&apos;s LAN address." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
   <Config Name="Config" Target="/config" Default="/mnt/user/appdata/filtarr" Mode="rw" Description="Database and encryption key. Back up both files together: the key decrypts your saved API keys." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/filtarr</Config>
   <Config Name="Public URL" Target="FILTARR_PUBLIC_URL" Default="" Mode="" Description="Optional. Only needed behind a reverse proxy: the public https:// address, e.g. https://filtarr.example.com. Leave empty for LAN use." Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Trust reverse proxy" Target="FILTARR_TRUST_PROXY" Default="false|true" Mode="" Description="Set to true only when Filtarr is reached through a reverse proxy, so it sees real client addresses. Leave false when clients connect directly." Type="Variable" Display="always" Required="false" Mask="false">false</Config>

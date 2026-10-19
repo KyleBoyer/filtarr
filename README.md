@@ -16,7 +16,7 @@ GitHub Actions tests every push, boots the image as a smoke test, and publishes 
 
 ### Unraid
 
-`unraid/filtarr.xml` is a Community Applications template. Until Filtarr is listed in Apps, add it by hand: in Unraid, go to Docker → Add Container, paste `https://raw.githubusercontent.com/KyleBoyer/filtarr/main/unraid/filtarr.xml` into Template, and apply. It stores everything in `/mnt/user/appdata/filtarr` and runs as `nobody:users` (PUID 99, PGID 100). The container takes ownership of the config folder on start, so an existing `filtarr.db` and `filtarr.db.key` can be copied in as-is. Find the first-run setup token in the container's log.
+`unraid/filtarr.xml` is a Community Applications template. Until Filtarr is listed in Apps, add it by hand: in Unraid, go to Docker → Add Container, paste `https://raw.githubusercontent.com/KyleBoyer/filtarr/main/unraid/filtarr.xml` into Template, and apply. It stores everything in `/mnt/user/appdata/filtarr`, runs as `nobody:users` (PUID 99, PGID 100), and uses Host networking so Sonarr, Radarr, Tautulli and Plex on the same server can be reached at `localhost` or the server's LAN address. In Host mode the template's WebUI Port sets the port Filtarr listens on. The container takes ownership of the config folder on start, so an existing `filtarr.db` and `filtarr.db.key` can be copied in as-is. Find the first-run setup token in the container's log.
 
 Every image also accepts `PUID`, `PGID` and `UMASK` (default 1000:1000).
 
