@@ -14,9 +14,15 @@ Filtarr is a self-hosted media rule engine. It reads movies from Radarr and seri
 
 GitHub Actions tests every push, boots the image as a smoke test, and publishes `ghcr.io/kyleboyer/filtarr` for `linux/amd64` and `linux/arm64` (`latest` from `main`, plus `sha-…` and version tags). To use it instead of building, replace `build: .` in `compose.yaml` with `image: ghcr.io/kyleboyer/filtarr:latest`.
 
+### Unraid
+
+`unraid/filtarr.xml` is a Community Applications template. Until Filtarr is listed in Apps, add it by hand: in Unraid, go to Docker → Add Container, paste `https://raw.githubusercontent.com/KyleBoyer/filtarr/main/unraid/filtarr.xml` into Template, and apply. It stores everything in `/mnt/user/appdata/filtarr` and runs as `nobody:users` (PUID 99, PGID 100). The container takes ownership of the config folder on start, so an existing `filtarr.db` and `filtarr.db.key` can be copied in as-is. Find the first-run setup token in the container's log.
+
+Every image also accepts `PUID`, `PGID` and `UMASK` (default 1000:1000).
+
 ### Reusing an existing database
 
-Everything Filtarr stores lives in `/config`: `filtarr.db` and `filtarr.db.key`, the key that decrypts saved API keys and tokens. To move a `pnpm dev` install (`packages/server/data/`) into Docker, stop it, then copy both files into the config volume or a bind-mounted folder. The container runs as the `node` user (uid 1000), so make the folder writable for it. Keep the `.key` file with the database: without it, saved Sonarr, Radarr, Plex and TMDB credentials can't be read. Only run one Filtarr against a database at a time, or enabled schedules run twice.
+Everything Filtarr stores lives in `/config`: `filtarr.db` and `filtarr.db.key`, the key that decrypts saved API keys and tokens. To move a `pnpm dev` install (`packages/server/data/`) into Docker, stop it, then copy both files into the config volume or a bind-mounted folder. The container fixes the folder's ownership for its `PUID`/`PGID` on start. Keep the `.key` file with the database: without it, saved Sonarr, Radarr, Plex and TMDB credentials can't be read. Only run one Filtarr against a database at a time, or enabled schedules run twice.
 
 The Plex account sign-in leaves Filtarr for Plex's hosted authentication page. HTTPS is recommended when accessing Filtarr outside a trusted local network. Configure a reverse proxy and set `FILTARR_PUBLIC_URL` to its public origin.
 

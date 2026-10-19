@@ -61,6 +61,13 @@ jobs:
           sleep 5
           curl -fsS -o /dev/null http://localhost:3000/
           docker logs filtarr-ci
+          # Unraid runs containers as 99:100: the entrypoint must take over the existing config and drop root.
+          docker rm -f filtarr-ci
+          docker run -d --name filtarr-ci -p 3000:3000 -e PUID=99 -e PGID=100 -v filtarr-ci:/config filtarr:ci
+          sleep 5
+          curl -fsS -o /dev/null http://localhost:3000/
+          test "$(docker exec filtarr-ci stat -c %u:%g /config/filtarr.db)" = 99:100
+          docker exec filtarr-ci grep -qE '^Uid:\s+99\s' /proc/1/status
       - name: Container logs on failure
         if: failure()
         run: docker logs filtarr-ci || true
