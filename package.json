@@ -1,0 +1,14 @@
+{
+  "name": "filtarr",
+  "private": true,
+  "packageManager": "pnpm@10.30.0",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c green,cyan \"pnpm --filter @filtarr/server dev\" \"pnpm --filter @filtarr/web dev\"",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @filtarr/core test && pnpm --filter @filtarr/server test",
+    "start": "pnpm --filter @filtarr/server start"
+  },
+  "pnpm": {"onlyBuiltDependencies": ["better-sqlite3", "esbuild"]},
+  "devDependencies": {"concurrently": "^9.2.1", "typescript": "^5.9.3"}
+}

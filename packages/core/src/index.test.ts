@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { ageRating, evaluate, planItem, rootTargetId, sourcesFor, starterRules, type MediaItem, type RuleDocument } from './index.js';
+const media:MediaItem={id:'c:movie:1',connectionId:'c',upstreamId:1,mediaType:'movie',title:'The Film',certification:'PG',certificationStatus:'resolved',genre:['Family'],year:2024,destination:'regular',tags:[],monitored:true,hasFile:true};
+describe('rule engine',()=>{
+  it('routes a PG film to Kids, stopping before the fallback',()=>{const rules=starterRules('kids','regular');const p=planItem(media,rules);expect(p.changes).toEqual([{type:'move',destinationId:'kids'}]);expect(p.trace).toHaveLength(1);expect(p.trace[0]?.stopped).toBe(true);});
+  it('keeps TV-PG outside Kids',()=>{const rules=starterRules('kids','regular');const p=planItem({...media,mediaType:'series',certification:'TV-PG'},rules);expect(p.changes).toEqual([]);expect(p.trace).toHaveLength(2);});
+  it('sends a resolved unrated title to Regular',()=>{const p=planItem({...media,certification:null,certificationStatus:'resolved',destination:'kids'},starterRules('kids','regular'));expect(p.blocked).toBeUndefined();expect(p.changes).toEqual([{type:'move',destinationId:'regular'}]);});
+  it('defers routing when a required rating lookup fails',()=>{const rules=starterRules('kids','regular');const p=planItem({...media,certification:null,certificationStatus:'lookup-error',destination:'kids'},rules);expect(p.blocked).toBeTruthy();});
+  it('handles all, any, not, and unknown without treating unknown as false',()=>{expect(evaluate(media,{kind:'all',children:[{kind:'predicate',field:'title',operator:'contains',value:'Film'},{kind:'predicate',field:'year',operator:'greaterThan',value:2020}]})).toBe(true);expect(evaluate({...media,certification:null},{kind:'not',child:{kind:'predicate',field:'certification',operator:'is',value:'PG'}})).toBe('unknown');});
+  it('exposes earlier tag changes to later rules',()=>{const rules:RuleDocument[]=[{id:'a',name:'Tag',condition:{kind:'predicate',field:'title',operator:'contains',value:'Film'},actions:[{type:'addTag',tag:'family'}],stopProcessing:false},{id:'b',name:'Route',condition:{kind:'predicate',field:'tag',operator:'is',value:'family'},actions:[{type:'move',destinationId:'kids'}],stopProcessing:true}];const p=planItem(media,rules);expect(p.changes).toEqual([{type:'move',destinationId:'kids'},{type:'addTag',tag:'family'}]);expect(p.trace[1]?.matched).toBe(true);});
+  it('produces no changes when already in the desired state',()=>{const rules=starterRules('kids','regular');expect(planItem({...media,destination:'kids'},rules).changes).toEqual([]);});
+  it('maps US, international, and numeric ratings onto one age scale',()=>{expect(['G','TV-Y','TV-G','L','C','TV-Y7','PG','PG-13','TV-14','12+','16+','7','R','TV-MA','NR',null].map(ageRating)).toEqual([0,0,0,0,0,7,8,13,14,12,16,7,17,17,null,null]);});
+  it('routes TV-G and international kids ratings to Kids by age',()=>{const rules=starterRules('kids','regular');for(const certification of ['TV-G','L','C','7','TV-Y7'])expect(planItem({...media,mediaType:'series',certification},rules).changes).toEqual([{type:'move',destinationId:'kids'}]);expect(planItem({...media,mediaType:'series',certification:'12+'},rules).changes).toEqual([]);});
+  it('keeps a pinned title in its pinned destination regardless of rules',()=>{const p=planItem({...media,destination:'kids',destinationOverride:'regular'},starterRules('kids','regular'));expect(p.changes).toEqual([{type:'move',destinationId:'regular'}]);expect(p.trace.at(-1)?.name).toBe('Manual override');expect(planItem({...media,destinationOverride:'regular'},starterRules('kids','regular')).changes).toEqual([]);});
+  it('does not block unrated titles on age comparisons',()=>{const p=planItem({...media,certification:'NR',destination:'regular'},[{id:'k',name:'Kids',condition:{kind:'predicate',field:'ageRating',operator:'atMost',value:8},actions:[{type:'move',destinationId:'kids'}],stopProcessing:true}]);expect(p.blocked).toBeUndefined();expect(p.changes).toEqual([]);});
+  it('moves to a root folder target without a named destination, picking the target for the item\'s own connection',()=>{
+    const rules:RuleDocument[]=[{id:'r',name:'Roots',condition:{kind:'predicate',field:'ageRating',operator:'atMost',value:8},actions:[{type:'move',destinationId:rootTargetId('c','/media/kids/movies')},{type:'move',destinationId:rootTargetId('s','/media/kids/tv')}],stopProcessing:true}];
+    const item={...media,destination:null,rootFolderPath:'/media/movies'};
+    expect(planItem(item,rules).changes).toEqual([{type:'move',destinationId:'root:c:/media/kids/movies'}]);
+    expect(planItem({...item,rootFolderPath:'/media/kids/movies/'},rules).changes).toEqual([]);
+    expect(planItem({...item,connectionId:'other'},rules).changes).toEqual([]);
+  });
+  it('matches destination conditions against root folder targets',()=>{expect(evaluate({...media,rootFolderPath:'/media/kids'},{kind:'predicate',field:'destination',operator:'is',value:'root:c:/media/kids'})).toBe(true);expect(evaluate({...media,connectionId:'x',rootFolderPath:'/media/kids'},{kind:'predicate',field:'destination',operator:'is',value:'root:c:/media/kids'})).toBe(false);});
+  it('matches list fields against any of several values and compares dates',()=>{expect(evaluate({...media,genre:['Family','Comedy']},{kind:'predicate',field:'genre',operator:'in',value:['Horror','comedy']})).toBe(true);expect(evaluate({...media,genre:['Drama']},{kind:'predicate',field:'genre',operator:'in',value:['Horror']})).toBe(false);expect(evaluate({...media,added:'2026-03-01T00:00:00Z'},{kind:'predicate',field:'added',operator:'greaterThan',value:'2026-01-01'})).toBe(true);expect(evaluate({...media,added:'2025-03-01T00:00:00Z'},{kind:'predicate',field:'added',operator:'greaterThan',value:'2026-01-01'})).toBe(false);});
+  it('evaluates catalog fields from meta, treating known-empty values as empty and failed providers as unknown',()=>{
+    const watched={...media,meta:{lastWatched:new Date(Date.now()-100*864e5).toISOString(),watchedBy:['ana','ben'],imdbRating:7.4,keywords:[]}};
+    expect(evaluate(watched,{kind:'predicate',field:'lastWatched',operator:'olderThanDays',value:90})).toBe(true);
+    expect(evaluate(watched,{kind:'predicate',field:'lastWatched',operator:'withinDays',value:90})).toBe(false);
+    expect(evaluate(watched,{kind:'predicate',field:'watchedBy',operator:'notIn',value:['cy']})).toBe(true);
+    expect(evaluate(watched,{kind:'predicate',field:'imdbRating',operator:'atLeast',value:'7'})).toBe(true);
+    expect(evaluate(watched,{kind:'predicate',field:'keywords',operator:'isNot',value:'christmas'})).toBe(true);
+    expect(evaluate(watched,{kind:'predicate',field:'keywords',operator:'is',value:'christmas'})).toBe(false);
+    expect(evaluate(watched,{kind:'predicate',field:'streamingOn',operator:'isMissing'})).toBe(true);
+    const failed={...media,meta:{},sourceIssues:{tmdb:'TMDB is not set up'}};
+    expect(evaluate(failed,{kind:'predicate',field:'streamingOn',operator:'is',value:'Netflix'})).toBe('unknown');
+    const p=planItem(failed,[{id:'s',name:'Streaming',condition:{kind:'predicate',field:'streamingOn',operator:'is',value:'Netflix'},actions:[{type:'addTag',tag:'x'}],stopProcessing:false}]);
+    expect(p.blocked).toBe('Required metadata is unknown: TMDB is not set up');
+    expect(evaluate({...media,added:new Date(Date.now()-5*864e5).toISOString()},{kind:'predicate',field:'added',operator:'withinDays',value:30})).toBe(true);
+  });
+  it('lists the providers a rule set needs',()=>{expect([...sourcesFor([{kind:'all',children:[{kind:'predicate',field:'daysSinceWatched'},{kind:'not',child:{kind:'predicate',field:'streamingOn'}},{kind:'predicate',field:'title'}]}])].sort()).toEqual(['plex','tmdb','watch']);});
+});

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.db
+*.db-*
+*.db.key
+.env
+.DS_Store
+coverage/
+data/
+*.db.bak-*
+*.tsbuildinfo

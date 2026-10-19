@@ -1,0 +1,16 @@
+services:
+  filtarr:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      FILTARR_DB: /config/filtarr.db
+      FILTARR_WEB_DIST: /app/packages/web/dist
+      FILTARR_PUBLIC_URL: ${FILTARR_PUBLIC_URL:-http://localhost:3000}
+      FILTARR_SECRET_KEY: ${FILTARR_SECRET_KEY:-}
+    volumes:
+      - filtarr-data:/config
+    restart: unless-stopped
+volumes:
+  filtarr-data:
